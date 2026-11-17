@@ -12,7 +12,15 @@
 <meta property="og:type" content="website">
 <link rel="canonical" href="https://fukuso.hibitool.com/sentaku/">
 <meta property="og:url" content="https://fukuso.hibitool.com/sentaku/">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%232f7fb8'/%3E%3Cpath d='M8 18h48' stroke='%23fff' stroke-width='3'/%3E%3Cpath d='M16 18l-6 10 6 2v20h32V30l6-2-6-10z' fill='%23fff'/%3E%3Ccircle cx='50' cy='12' r='5' fill='%23ffd34d'/%3E%3C/svg%3E">
+<link rel="icon" href="favicon-48.png" sizes="48x48" type="image/png">
+<link rel="icon" href="icon-192.png" sizes="192x192" type="image/png">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2f7fb8">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="洗濯指数">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
@@ -87,6 +95,16 @@ section.read dd{margin:2px 0 0;color:var(--sub);font-size:14px}
 footer{padding:20px 0 40px;font-size:12px;color:var(--sub);text-align:center}
 footer a{color:var(--sub)}
 .small{font-size:12px;color:var(--sub)}
+.hide{display:none!important}
+.pbox{background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:4px 18px 14px;margin:18px 0 0}
+.pbox h2{font-size:18px;margin:12px 0 4px}
+.pbox p{margin:4px 0;font-size:14px}
+.prow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;font-size:14px}
+.prow select{font:inherit;font-size:16px;padding:5px 8px;border:1px solid var(--line);border-radius:4px;background:#fff;color:var(--ink)}
+.pbtn{font:inherit;font-size:14px;padding:8px 16px;border:1px solid var(--line);border-radius:4px;background:#fff;color:var(--ink);cursor:pointer}
+.pbtn.main{background:var(--sky);border-color:var(--sky);color:#fff;font-weight:700}
+.pmsg{color:var(--sub);font-size:13px!important;min-height:1em}
+.pios{font-size:13px;background:#fff6dc;border:1px solid #ecd9a0;padding:8px 12px;border-radius:4px;margin-top:10px}
 @media (max-width:480px){
   .verdict .word{font-size:28px}
   .verdict .ico{width:52px;height:52px}
@@ -111,6 +129,15 @@ footer a{color:var(--sub)}
   <div id="status" class="status">天気を読み込んでいます…</div>
   <div id="days" class="days"></div>
   <p class="small" id="updated"></p>
+
+  <section class="pbox" id="pushBox">
+    <h2>毎朝の通知</h2>
+    <p id="pushState"></p>
+    <div class="prow"><label>知らせる時刻 <select id="pushTime"><option value="330">5:30</option><option value="360">6:00</option><option value="390">6:30</option><option value="420" selected>7:00</option><option value="450">7:30</option><option value="480">8:00</option><option value="540">9:00</option></select></label></div>
+    <div class="prow"><button class="pbtn main" id="pushOn">通知をオンにする</button><button class="pbtn" id="pushTest">テスト通知</button><button class="pbtn" id="pushOff">オフにする</button></div>
+    <p class="pmsg" id="pushMsg"></p>
+    <div class="pios hide" id="pushIos"><b>iPhone・iPad の場合</b>：Safari の共有ボタン（□に↑）→「ホーム画面に追加」で追加し、ホーム画面のアイコンから開くと通知をオンにできます（iOS 16.4 以降）。</div>
+  </section>
   <a href="../" style="display:block;margin:16px 0 0;padding:12px 16px;background:var(--paper);border:1px solid var(--line);border-left:6px solid var(--sky);border-radius:4px;color:var(--ink);text-decoration:none">今日は何を着る？　<b style="color:var(--sky)">きょうの服装予報</b>で、半袖・長袖・上着と傘をチェック →</a>
 
   <section class="read">
@@ -162,7 +189,7 @@ try{
   const n = PRESETS.findIndex(p=>p[0]===s); if(n>=0) idx=n;
 }catch(e){}
 sel.value = idx;
-sel.addEventListener("change",()=>{ idx=+sel.value; try{localStorage.setItem(KEY,PRESETS[idx][0]);}catch(e){} load(); });
+sel.addEventListener("change",()=>{ idx=+sel.value; try{localStorage.setItem(KEY,PRESETS[idx][0]);}catch(e){} load(); if(window.pushSync) pushSync(); });
 
 const C = {ok:"#2c8a57", mid:"#c98a14", ng:"#58627d"};
 const pad = n => String(n).padStart(2,"0");
@@ -389,6 +416,16 @@ function render(w, a, lat, lon){
   document.getElementById("updated").textContent = "更新："+now.getHours()+"時"+pad(now.getMinutes())+"分（ページを開くたびに最新の予報を読み込みます）";
 }
 load();
+
+/* 通知の設定（共通部品 push-client.js が使う） */
+const PUSH_APP="sentaku";
+const pushTimeEl=document.getElementById("pushTime");
+try{ const v=localStorage.getItem("sentaku-push-time"); if(v&&[...pushTimeEl.options].some(o=>o.value===v)) pushTimeEl.value=v; }catch(e){}
+function pushPayload(){ const p=PRESETS[idx]; const m=+pushTimeEl.value; return {minute:m, settings:{minute:m, lat:p[1], lon:p[2], name:p[0]}}; }
+function pushDesc(){ const m=+pushTimeEl.value; return "毎朝 "+Math.floor(m/60)+":"+pad(m%60)+" に、"+PRESETS[idx][0]+"の「今日は外干しOK 10時〜15時」のような干し方と、花粉・黄砂の注意をお知らせします。"; }
+function pushReady(){ return ""; }
+pushTimeEl.onchange=()=>{ try{localStorage.setItem("sentaku-push-time",pushTimeEl.value);}catch(e){} pushSync(); };
 </script>
+<script src="push-client.js"></script>
 </body>
 </html>
