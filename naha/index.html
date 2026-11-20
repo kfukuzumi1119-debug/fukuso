@@ -76,6 +76,28 @@ button,select,input{font:inherit;color:inherit}
 .tab{flex:1;background:none;border:0;border-right:1px solid var(--line);padding:8px 4px;cursor:pointer;font-size:14px;color:var(--muted)}
 .tab:last-child{border-right:0}
 .tab[aria-selected="true"]{background:var(--ink);color:var(--paper);font-weight:700}
+.tab small{display:block;font-size:11px;font-weight:500;line-height:1.3}
+.tab.past{font-size:13px}
+.past-note{border-left:4px solid var(--muted);padding:6px 12px;margin:0 0 12px;font-size:13px;color:var(--muted);background:var(--paper)}
+.week{margin-top:18px}
+.week h3 span{font-weight:500}
+.wk{display:grid;grid-template-columns:repeat(7,1fr);border:1px solid var(--line);background:var(--paper)}
+.wk > div{padding:8px 4px;text-align:center;border-right:1px solid var(--line);font-size:13px}
+.wk > div:last-child{border-right:0}
+.wk .d{font-weight:700}
+.wk .d.sat{color:#2b6cb0}.wk .d.sun{color:#c0392b}
+.wk .w{margin:4px 0;min-height:2.6em;display:flex;align-items:center;justify-content:center;line-height:1.3}
+.wk .t b{color:var(--warm)}
+.wk .t i{font-style:normal;color:var(--muted)}
+.wk .p{font-size:12px;color:var(--muted);margin-top:2px}
+.wk .p.r{color:var(--rain);font-weight:700}
+@media (max-width:640px){
+  .wk{grid-template-columns:1fr}
+  .wk > div{display:grid;grid-template-columns:6.5em 1fr 6em 4.5em;align-items:center;text-align:left;border-right:0;border-bottom:1px solid var(--line);padding:8px 10px}
+  .wk > div:last-child{border-bottom:0}
+  .wk .w{margin:0;min-height:0;justify-content:flex-start}
+  .wk .p{margin:0;text-align:right}
+}
 .who{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .seg{display:flex;border:1px solid var(--line);background:var(--paper);flex:1 1 240px;max-width:360px}
 .seg button{flex:1;background:none;border:0;border-right:1px solid var(--line);padding:7px 4px;cursor:pointer;font-size:14px;color:var(--muted)}
@@ -198,6 +220,8 @@ footer a{color:var(--accent)}
     <div class="status">天気を読み込んでいます…</div>
   </div>
 
+  <section class="week" id="week"></section>
+
   <a href="https://fukuso.hibitool.com/sentaku/naha/" style="display:block;margin:18px 0 6px;padding:12px 16px;border:1px solid currentColor;border-left:6px solid #2f7fb8;border-radius:4px;color:inherit;text-decoration:none;opacity:.92">洗濯物は外に干せる？　<b style="color:#2f7fb8">那覇の洗濯指数</b>で、今日・明日の外干しの時間帯と花粉・黄砂をチェック →</a>
 
   <section class="guide">
@@ -254,14 +278,15 @@ const FIXED = window.FIXED_CITY ? PRESETS.find(p => p[3]===window.FIXED_CITY) : 
 const WX = {0:"快晴",1:"晴れ",2:"晴れ時々くもり",3:"くもり",45:"霧",48:"霧",51:"霧雨",53:"霧雨",55:"霧雨",
   56:"冷たい霧雨",57:"冷たい霧雨",61:"小雨",63:"雨",65:"強い雨",66:"冷たい雨",67:"冷たい雨",71:"小雪",73:"雪",75:"大雪",
   77:"雪",80:"にわか雨",81:"にわか雨",82:"激しいにわか雨",85:"にわか雪",86:"強いにわか雪",95:"雷雨",96:"雷雨（ひょう）",99:"雷雨（ひょう）"};
-const DAYNAME = ["今日","明日","あさって"];
+// 天気は昨日（past_days=1）から10日先まで取る。0=昨日 1=今日 2=明日 3=あさって、4〜10=3日後〜9日後（週間天気）
+const DAYNAME = ["昨日","今日","明日","あさって"];
 const WEEK = "日月火水木金土";
 
 let place = FIXED ? {name:FIXED[0],lat:FIXED[1],lon:FIXED[2]} : load();
 if(!place || !PRESETS.some(p => p[0]===place.name)) place = {name:"東京",lat:35.6895,lon:139.6917};
 let sense = (() => { try{ return +localStorage.getItem("fukuso-sense") || 0; }catch(e){ return 0; } })();
 if(![-2,0,2].includes(sense)) sense = 0;
-let data = null, dayIdx = 0;
+let data = null, dayIdx = 1;
 let who = (() => { try{ return localStorage.getItem("fukuso-who"); }catch(e){ return null; } })();
 if(!["m","f","k"].includes(who)) who = "m";
 
@@ -310,8 +335,8 @@ function fillTabs(){
   const t = $("tabs");
   t.innerHTML = DAYNAME.map((n,i) => {
     let label = n;
-    if(data){ const d = new Date(data.daily.time[i]+"T00:00"); label += `（${d.getMonth()+1}/${d.getDate()} ${WEEK[d.getDay()]}）`; }
-    return `<button class="tab" role="tab" type="button" aria-selected="${i===dayIdx}" data-i="${i}">${label}</button>`;
+    if(data){ const d = new Date(data.daily.time[i]+"T00:00"); label += `<small>${d.getMonth()+1}/${d.getDate()}（${WEEK[d.getDay()]}）</small>`; }
+    return `<button class="tab${i===0?" past":""}" role="tab" type="button" aria-selected="${i===dayIdx}" data-i="${i}">${label}</button>`;
   }).join("");
   t.querySelectorAll(".tab").forEach(b => b.addEventListener("click", () => { dayIdx = +b.dataset.i; coordIdx = 0; fillTabs(); render(); }));
 }
@@ -323,12 +348,12 @@ async function fetchWeather(){
   const u = "https://api.open-meteo.com/v1/forecast?latitude="+place.lat+"&longitude="+place.lon+
     "&hourly=temperature_2m,apparent_temperature,precipitation_probability,weather_code,wind_speed_10m"+
     "&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,precipitation_probability_max,precipitation_sum,uv_index_max,wind_speed_10m_max"+
-    "&timezone=Asia%2FTokyo&forecast_days=3&wind_speed_unit=ms";
+    "&timezone=Asia%2FTokyo&past_days=1&forecast_days=10&wind_speed_unit=ms";
   try{
     const res = await fetch(u);
     if(!res.ok) throw new Error(res.status);
     data = await res.json();
-    fillTabs(); render();
+    fillTabs(); render(); renderWeek();
   }catch(err){
     showStatus("天気を読み込めませんでした。インターネットにつながっているか確かめて、ページを開き直してください。", true);
   }
@@ -652,7 +677,7 @@ function plan(i, who){
   const mornFeel = Math.min(...hr(7,9,"apparent_temperature"));
   const eveFeel = Math.min(...hr(18,21,"apparent_temperature"));
   const outerT = Math.min(mornFeel, eveFeel);
-  const rainP = Math.max(...hr(6,21,"precipitation_probability"));
+  const rainP = Math.max(0, ...hr(6,21,"precipitation_probability"));
   const rainSum = D.precipitation_sum[i] || 0;
   const wind = D.wind_speed_10m_max[i];
   const uv = D.uv_index_max[i];
@@ -712,10 +737,11 @@ function render(){
   const d = new Date(data.daily.time[dayIdx]+"T00:00");
   $("date").textContent = `${place.name}　${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日（${WEEK[d.getDay()]}）`;
   $("main").innerHTML = `
+  ${dayIdx===0 ? `<p class="past-note">昨日の天気（実際に近い値）での服装の目安です。昨日の服装と比べて、今日の参考や振り返りにどうぞ。</p>` : ""}
   <div class="cols"><div class="col">
     <div class="board">
       <div class="verdict">
-        <div class="eyebrow">${DAYNAME[dayIdx]}の服装（${WHO[who].label}）</div>
+        <div class="eyebrow">${DAYNAME[dayIdx]}の服装（${WHO[who].label}）${dayIdx===0?"・振り返り":""}</div>
         <h2>${p.head[0]}</h2>
         <p>${p.head[1]}</p>
       </div>
@@ -785,8 +811,24 @@ function chart(i){
   </svg>`;
 }
 
+// 週間天気（3日後〜9日後の7日分）。服装は出さず、天気だけ
+function renderWeek(){
+  const D = data.daily, el = $("week");
+  const cells = [];
+  for(let i=4; i<D.time.length && cells.length<7; i++){
+    const d = new Date(D.time[i]+"T00:00"), wd = d.getDay();
+    const hol = wd===0 ? " sun" : wd===6 ? " sat" : "";
+    const p = D.precipitation_probability_max[i];
+    cells.push(`<div><div class="d${hol}">${d.getMonth()+1}/${d.getDate()}（${WEEK[wd]}）</div>`+
+      `<div class="w">${WX[D.weather_code[i]]||"—"}</div>`+
+      `<div class="t"><b>${r0(D.temperature_2m_max[i])}°</b> / <i>${r0(D.temperature_2m_min[i])}°</i></div>`+
+      `<div class="p${p>=50?" r":""}">雨 ${p!=null?p:"—"}%</div></div>`);
+  }
+  el.innerHTML = cells.length ? `<h3>週間天気<span>3日後〜（${place.name}）</span></h3><div class="wk">${cells.join("")}</div>` : "";
+}
+
 // 夜（19時以降）に開いたら明日を最初に見せる
-if(new Date().getHours()>=19) dayIdx = 1;
+if(new Date().getHours()>=19) dayIdx = 2;
 fillSelect(); fillWho(); fillSense(); fillTabs(); fetchWeather();
 </script>
 </body>
