@@ -224,7 +224,7 @@ const FIXED = window.FIXED_CITY ? PRESETS.findIndex(p=>p[3]===window.FIXED_CITY)
 let idx = 3;
 try{
   let s = localStorage.getItem(KEY);
-  if(!s){ const f = JSON.parse(localStorage.getItem("fukuso-place")||"null"); if(f&&f.name) s=f.name; }  // 服装予報で選んだ都市を引き継ぐ
+  if(!s){ const f = JSON.parse(localStorage.getItem("fukuso-place")||"null"); if(f&&(f.near||f.name)) s=f.near||f.name; }  // 服装予報で選んだ都市を引き継ぐ
   const n = PRESETS.findIndex(p=>p[0]===s); if(n>=0) idx=n;
 }catch(e){}
 if(FIXED>=0) idx=FIXED;
